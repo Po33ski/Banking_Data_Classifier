@@ -22,23 +22,20 @@ def load_raw_dataset(cfg: DatasetConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df_raw_test = hf_ds["test"].to_pandas()
 
     # Check if the columns exist
-    if cfg.text_col not in df_raw_train.columns:
-        raise KeyError(f"[ingest] text_col='{cfg.text_col}' not found in dataset columns: {list(df_raw_train.columns)}")
-    if cfg.label_col not in df_raw_train.columns:
-        raise KeyError(f"[ingest] label_col='{cfg.label_col}' not found in dataset columns: {list(df_raw_train.columns)}")
-    if cfg.text_col not in df_raw_test.columns:
-        raise KeyError(f"[ingest] text_col='{cfg.text_col}' not found in dataset columns: {list(df_raw_test.columns)}")
-    if cfg.label_col not in df_raw_test.columns:
-        raise KeyError(f"[ingest] label_col='{cfg.label_col}' not found in dataset columns: {list(df_raw_test.columns)}")
+    if "text" not in df_raw_train.columns:
+        raise KeyError(f"[ingest] text not found in dataset columns: {list(df_raw_train.columns)}")
+    if "label" not in df_raw_train.columns:
+        raise KeyError(f"[ingest] label not found in dataset columns: {list(df_raw_train.columns)}")
+    if "text" not in df_raw_test.columns:
+        raise KeyError(f"[ingest] text not found in dataset columns: {list(df_raw_test.columns)}")
+    if "label" not in df_raw_test.columns:
+        raise KeyError(f"[ingest] label not found in dataset columns: {list(df_raw_test.columns)}")
 
-    df_train = df_raw_train[[cfg.text_col, cfg.label_col]].copy()
-    df_train[cfg.text_col] = df_train[cfg.text_col].astype(str).str.strip()
-    df_test = df_raw_test[[cfg.text_col, cfg.label_col]].copy()
-    df_test[cfg.text_col] = df_test[cfg.text_col].astype(str).str.strip()
+    df_train = df_raw_train[["text", "label"]].copy()
+    df_train["text"] = df_train["text"].astype(str).str.strip()
+    df_test = df_raw_test[["text", "label"]].copy()
+    df_test["text"] = df_test["text"].astype(str).str.strip()
 
-    # Normalize column names expected by the rest of the pipeline
-    df_train = df_train.rename(columns={cfg.text_col: "text", cfg.label_col: "label"})
-    df_test = df_test.rename(columns={cfg.text_col: "text", cfg.label_col: "label"})
     print(f"[ingest] Loaded rows: {len(df_train)} (columns: text, label)")
     return df_train, df_test
 

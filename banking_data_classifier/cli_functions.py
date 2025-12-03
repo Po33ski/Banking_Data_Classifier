@@ -60,27 +60,32 @@ def run_clean(cfg: ProjectConfig) -> None:
 
 def run_quality(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
-    in_path = cfg.paths.artifacts_dir / "clean.parquet"
-    if not in_path.exists():
-        typer.echo("[quality] 'clean.parquet' not found. Run 'uv run clean' first.")
-        raise typer.Exit(code=1)
-    df_clean = pd.read_parquet(in_path)
-    if cfg.dataset.sample_size:
-        assert cfg.dataset.sample_size > 0, "Sample size must be greater than 0"
-        df_clean = resample(
-            df_clean,
-            replace=False,
-            n_samples=cfg.dataset.sample_size,
-            random_state=cfg.dataset.random_state,
-            stratify=df_clean["label"],
-        )
-        df_clean = df_clean.reset_index(drop=True)
-    for i in range(cfg.quality.quality_iterations):
-        typer.echo(f"[quality] Running CleanLab iteration {i+1}")
-        df_clean = run_cleanlab(df_clean, cfg.quality)
-    out = cfg.paths.artifacts_dir / f"quality_fixed.parquet"
-    df_clean.to_parquet(out, index=False)
-    typer.echo(f"[quality] Quality output saved to: {out}")
+    if cfg.quality.quality_train:   # quality the train dataframe
+        in_path_train = cfg.paths.artifacts_dir / "clean_train.parquet"
+        if not in_path_train.exists():
+            typer.echo("[quality] 'clean_train.parquet' not found. Run 'uv run clean' first.")
+            raise typer.Exit(code=1)
+        df_clean_train = pd.read_parquet(in_path_train)
+        typer.echo("[quality] Running CleanLab for the train dataframe")
+        for i in range(cfg.quality.quality_iterations):
+            typer.echo(f"[quality] Running CleanLab iteration {i+1} for the train dataframe")
+            df_clean_train = run_cleanlab(df_clean_train, cfg.quality)
+        out_path_train = cfg.paths.artifacts_dir / f"quality_fixed_train.parquet"
+        df_clean_train.to_parquet(out_path_train, index=False)
+        typer.echo(f"[quality] Quality output saved to: {out_path_train}")
+    if cfg.quality.quality_test:   # quality the test dataframe
+        in_path_test = cfg.paths.artifacts_dir / "clean_test.parquet"
+        if not in_path_test.exists():
+            typer.echo("[quality] 'clean_test.parquet' not found. Run 'uv run clean' first.")
+            raise typer.Exit(code=1)
+        df_clean_test = pd.read_parquet(in_path_test)
+        typer.echo("[quality] Running CleanLab for the test dataframe")
+        for i in range(cfg.quality.quality_iterations):
+            typer.echo(f"[quality] Running CleanLab iteration {i+1} for the test dataframe")
+            df_clean_test = run_cleanlab(df_clean_test, cfg.quality)
+        out_path_test = cfg.paths.artifacts_dir / f"quality_fixed_test.parquet"
+        df_clean_test.to_parquet(out_path_test, index=False)
+        typer.echo(f"[quality] Quality output saved to: {out_path_test}")
 
 
 def run_split(cfg: ProjectConfig) -> None:

@@ -95,7 +95,7 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         raise ValueError("[quality] Sample verification failed.")
         
     # create a dataframe with columns: text, label
-    data_df = df[["text", "label"]].copy()     # df is this 5k sample
+    data_df = df[["text", "label"]].copy()  
     dataset = Dataset.from_pandas(data_df, preserve_index=False)
     dataset.set_format(type="python")  # or type="numpy"
     lab = Datalab(dataset, label_name="label", task="classification")
@@ -116,7 +116,18 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         print()
     else:
         print(f"[quality] Near-duplicate issues flagged: {len(duplicate_issues)}")
-        # Remove the case-sensitive duplicates
+
+        # Show a small sample of near-duplicate texts before dropping them
+        print("[quality] Example near-duplicate groups (original text and a few neighbors):")
+        for idx, row in duplicate_issues.iterrows():
+            base_text = df.iloc[idx]["text"]
+            neighbor_idxs = row["near_duplicate_sets"][:3]
+            neighbor_texts = df.iloc[neighbor_idxs]["text"].tolist()
+            print(f"- Base text (idx={idx}): {base_text}")
+            print(f"  Neighbors: {neighbor_texts}")
+            print()
+
+        # Remove the case-insensitive duplicates
         df["text_lower"] = df["text"].str.lower()
         df_deduplicated = df.drop_duplicates(subset="text_lower")
         df_deduplicated = df_deduplicated.drop(columns="text_lower")

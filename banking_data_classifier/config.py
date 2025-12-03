@@ -10,10 +10,6 @@ from pydantic import BaseModel, Field
 class DatasetConfig(BaseModel):
     # Hugging Face dataset identifier, e.g. "PolyAI/banking77"
     dataset_name: str = Field(default="PolyAI/banking77")
-    # Column names in the raw dataset that contain the text and labels.
-    # These are renamed internally to "text" and "label" for downstream code.
-    text_col: str = Field(default="text")
-    label_col: str = Field(default="label")
     random_state: int = Field(default=0)
 
 # CleaningConfig: Configuration for the cleaning like removing terms, casefolding, deduplication, etc.
@@ -52,13 +48,25 @@ class TrainConfig(BaseModel):
 
 # QualityConfig: Configuration for the quality like embedding model name, cv folds, logistic C, etc.
 class QualityConfig(BaseModel):
+    # quality_train: quality the train dataframe
+    quality_train: bool = Field(default=True)
+    # quality_test: quality the test dataframe
+    quality_test: bool = Field(default=False)
+    # embedding_model_name: the name of the embedding model
     embedding_model_name: str = Field(default="all-MiniLM-L6-v2")
+    # quality_iterations: the number of iterations to run the quality analysis
     quality_iterations: int = Field(default=3, ge=1)
+    # cv_folds: the number of cross-validation folds
     cv_folds: int = Field(default=5, ge=2)
+    # regularization_c: the regularization parameter
     regularization_c: float = Field(default=0.1, gt=0.0)
-    device: str = Field(default="cuda")
+    # device: the device to use for the embedding model
+    embedding_device: str = Field(default="cuda")
+    # label_issue_threshold: the threshold for the label issue
     label_issue_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    # max_label_fixes: the maximum number of label fixes
     max_label_fixes: Optional[int] = Field(default=None, ge=1)
+    
 # PathsConfig: Configuration for the paths like artifacts dir, etc.
 class PathsConfig(BaseModel):
     artifacts_dir: Path = Field(default=Path("artifacts"))

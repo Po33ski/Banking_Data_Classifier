@@ -13,10 +13,10 @@ def clean_dataframe(df_raw: pd.DataFrame, cfg: CleaningConfig) -> pd.DataFrame:
     Apply simple cleaning rules to a dataframe and return a cleaned dataframe.
     """
     df = df_raw.copy()
-    df[cfg.text_col] = df[cfg.text_col].astype(str).str.strip()
+    df["text"] = df["text"].astype(str).str.strip()
     # Drop very short texts
     if cfg.min_text_len > 0:
-        df = df[df[cfg.text_col].str.len() >= cfg.min_text_len]
+        df = df[df["text"].str.len() >= cfg.min_text_len]
         df = df.reset_index(drop=True)
     
     # Optional lowercasing
@@ -26,7 +26,7 @@ def clean_dataframe(df_raw: pd.DataFrame, cfg: CleaningConfig) -> pd.DataFrame:
 
     # Case-insensitive deduplication if enabled
     if cfg.drop_duplicates:
-        df = df.drop_duplicates(subset=cfg.text_col)
+        df = df.drop_duplicates(subset="text")
         df = df.reset_index(drop=True)
     df = df.reset_index(drop=True)
 
