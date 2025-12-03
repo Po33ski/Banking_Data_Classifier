@@ -33,7 +33,7 @@ class SplitConfig(BaseModel):
     # use_concatenated_all_samples: bool = Field(default=False) #if here is True then the clean_test and quality_test in CleaningConfig and QualityConfig must be False
     train_frac: float = Field(default=0.8, ge=0.0, le=1.0)
     valid_frac: float = Field(default=0.2, ge=0.0, le=1.0)
-    test_frac: float = Field(default=0.0, ge=0.0, le=1.0) # set only if use_concatenated_all_samples is True
+    test_frac: float = Field(default=0.0, ge=0.0, le=1.0) # set more than 0 only if concatenate_all_samples is True
     random_state: int = Field(default=0)
     stratify: bool = Field(default=True)
     # validate_sum: validate the sum of the split fractions
@@ -44,10 +44,15 @@ class SplitConfig(BaseModel):
 
 # TrainConfig: Configuration for the training like model name, learning rate, epochs, seed, use_cpu, etc.
 class TrainConfig(BaseModel):
+    # model_name: the name of the model
     model_name: str = Field(default="distilbert/distilbert-base-uncased")
+    # learning_rate: the learning rate
     learning_rate: float = Field(default=1e-4, gt=0.0)
+    # epochs: the number of epochs
     epochs: int = Field(default=5, ge=1)
+    # seed: the seed for the random number generator
     seed: int = Field(default=0)
+    # device: the device to use for the training
     device: str = Field(default="cuda") # "cuda" or "cpu"
 
 # QualityConfig: Configuration for the quality like embedding model name, cv folds, logistic C, etc.

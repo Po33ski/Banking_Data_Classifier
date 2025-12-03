@@ -4,7 +4,7 @@ from typing import Optional
 import typer
 
 from .config import ProjectConfig
-from .cli_functions import run_load, run_clean, run_quality, run_split, run_train, run_evaluate, run_explain, run_scan, run_purge
+from .cli_functions import run_load, run_clean, run_quality, run_split, run_train, run_evaluate, run_scan, run_purge
 
 # app: root of the CLI
 app = typer.Typer(add_completion=False, help="Banking77 intent classification - MLOps-friendly CLI")
@@ -46,11 +46,11 @@ def evaluate(config: Optional[str] = typer.Option(None, "--config", "-c")) -> No
     cfg = ProjectConfig.load(config)
     run_evaluate(cfg)
 
-
-@app.command()
-def explain(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
-    cfg = ProjectConfig.load(config)
-    run_explain(cfg)
+# explain: explain the model on the test set
+# @app.command()
+# def explain(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
+#     cfg = ProjectConfig.load(config)
+#     run_explain(cfg)
 
 # scan: scan the test set with Giskard
 @app.command()
@@ -78,6 +78,9 @@ def all(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
         run_clean,
         run_quality,
         run_split,
+        run_train,
+        run_evaluate,
+        run_scan,
     )
     for step in steps:
         step(cfg)

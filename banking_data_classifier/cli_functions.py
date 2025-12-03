@@ -13,7 +13,7 @@ from .splits import split_dataframe
 from .train_hf import train_hf
 from .evaluate import evaluate_model
 from .behavioral import run_giskard_scan
-from .explain import explain_samples
+# from .explain import explain_samples
 
 
 
@@ -157,7 +157,7 @@ def run_evaluate(cfg: ProjectConfig) -> None:
     test_df = pd.read_parquet(splits_dir / "test.parquet")
     model_dir = cfg.paths.artifacts_dir / "finetuned_model"
     tokenized_dir = cfg.paths.artifacts_dir / "tokenized"
-    metrics = evaluate_model(model_dir, tokenized_dir, test_df)
+    metrics = evaluate_model(model_dir, tokenized_dir, len(test_df))
     out = cfg.paths.artifacts_dir / "metrics.json"
     import json as _json
 
@@ -166,16 +166,24 @@ def run_evaluate(cfg: ProjectConfig) -> None:
 
 
 def run_explain(cfg: ProjectConfig) -> None:
-    ensure_dirs(cfg)
-    splits_dir = cfg.paths.artifacts_dir / "splits"
-    if not (splits_dir / "test.parquet").exists():
-        typer.echo("[explain] Test split not found. Run 'uv run split' first.")
-        raise typer.Exit(code=1)
-    test_df = pd.read_parquet(splits_dir / "test.parquet")
-    model_dir = cfg.paths.artifacts_dir / "finetuned_model"
-    out = cfg.paths.artifacts_dir / "explain"
-    explain_samples(model_dir, test_df, out)
-    typer.echo(f"[explain] Saved attribution TSVs to: {out}")
+    """
+    Run explanation/attribution analysis for a few samples from the test set.
+    The heavy Captum import is done lazily inside to avoid forcing this
+    dependency for unrelated CLI commands.
+    """
+    # Local import so that other commands (e.g. purge/load) don't require Captum/explain deps
+    # from .explain import explain_samples
+
+    # ensure_dirs(cfg)
+    # splits_dir = cfg.paths.artifacts_dir / "splits"
+    # if not (splits_dir / "test.parquet").exists():
+    #     typer.echo("[explain] Test split not found. Run 'uv run split' first.")
+    #     raise typer.Exit(code=1)
+    # test_df = pd.read_parquet(splits_dir / "test.parquet")
+    # model_dir = cfg.paths.artifacts_dir / "finetuned_model"
+    # out = cfg.paths.artifacts_dir / "explain"
+    # explain_samples(model_dir, test_df, out)
+    # typer.echo(f"[explain] Saved attribution TSVs to: {out}")
 
 
 def run_scan(cfg: ProjectConfig) -> None:

@@ -9,8 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset, DatasetDict
-from sklearn.metrics import matthews_corrcoef
-from torch.nn.functional import softmax
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -36,7 +35,13 @@ def _build_datasets(train_df: pd.DataFrame, valid_df: pd.DataFrame, test_df: pd.
     return ds
 
 
-def train_hf(train_df: pd.DataFrame, valid_df: pd.DataFrame, test_df: pd.DataFrame, train_cfg: TrainConfig, paths: PathsConfig) -> Tuple[Path, Dict[str, Any]]:
+def train_hf(
+    train_df: pd.DataFrame,
+    valid_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    train_cfg: TrainConfig,
+    paths: PathsConfig,
+) -> Tuple[Path, Dict[str, Any]]:
     """
     Fine-tune DistilBERT (or other HF model) on GPU or CPU and save artifacts.
     """
@@ -59,31 +64,40 @@ def train_hf(train_df: pd.DataFrame, valid_df: pd.DataFrame, test_df: pd.DataFra
     tokenizer = AutoTokenizer.from_pretrained(train_cfg.model_name)
     # Build datasets
     datasets_tokenized = _build_datasets(train_df, valid_df, test_df, tokenizer)
-    model = AutoModelForSequenceClassification.from_pretrained(train_cfg.model_name, num_labels=2) # num_labels=2 because we have 2 classes: positive and negative
+    # Determine number of classes from all splits (e.g. 77 for banking77)
+    all_df = pd.concat([train_df, valid_df, test_df], ignore_index=True)
+    num_labels = int(all_df["label"].nunique())
+    model = AutoModelForSequenceClassification.from_pretrained(
+        train_cfg.model_name,
+        num_labels=num_labels,
+    )
 
-    # Compute metrics: MCC (Matthews Correlation Coefficient) for evaluation metrics (MCC is a measure of the quality of the classification model)
+    # Compute metrics for evaluation: accuracy, macro F1 and macro AUROC (one-vs-one) for multi-class classification
     def compute_metrics(eval_pred: EvalPrediction) -> dict:
         y_true = eval_pred.label_ids.ravel()
         logits = torch.from_numpy(eval_pred.predictions)
-        y_pred_proba = softmax(logits, dim=1)[:, 1].numpy()
-        y_pred = (y_pred_proba >= 0.5).astype(int)
-        mcc = matthews_corrcoef(y_true, y_pred)
-        return {"MCC": mcc}
+        probs = torch.softmax(logits, dim=1).numpy()
+        y_pred = probs.argmax(axis=1)
+        acc = accuracy_score(y_true, y_pred)
+        f1_macro = f1_score(y_true, y_pred, average="macro")
+        auroc_ovo_macro = roc_auc_score(y_true, probs, multi_class="ovo", average="macro") # macro AUROC (one-vs-one) is the average of the AUROC for each class
+        return {"accuracy": acc, "f1_macro": f1_macro, "auroc_ovo_macro": auroc_ovo_macro}
 
     training_args = TrainingArguments(
         output_dir=str(out_dir),
         learning_rate=train_cfg.learning_rate,
         num_train_epochs=train_cfg.epochs,
+        # older Transformers versions expect `eval_strategy` instead of `evaluation_strategy`
         eval_strategy="steps",
         save_steps=1000,
         eval_steps=1000,
         save_total_limit=1,
-        load_best_model_at_end=True,
+        load_best_model_at_end=True,  # load the best model at the end of the training
         seed=train_cfg.seed,
         data_seed=train_cfg.seed,
         fp16=train_cfg.device == "cuda",
-        dataloader_num_workers=1, # the previous checkpoint is deleted
-        use_cpu= train_cfg.device == "cpu"
+        dataloader_num_workers=1,
+        use_cpu=train_cfg.device == "cpu",
     )
 
     # Create the trainer

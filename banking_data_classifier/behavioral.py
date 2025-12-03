@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import torch
 from giskard import Model as GiskardModel, Dataset as GiskardDataset, scan
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 
 def run_giskard_scan(model_dir: Path, test_df: pd.DataFrame, device: str = "cuda", out_dir: Optional[Path] = None):
     """
@@ -16,35 +17,37 @@ def run_giskard_scan(model_dir: Path, test_df: pd.DataFrame, device: str = "cuda
     Saves a simple text summary if out_dir is provided.
     """
     device_resolved = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
-    device_index = 0 if device_resolved == "cuda" else -1
 
-    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir))
+
+    model = AutoModelForSequenceClassification.from_pretrained(str(model_dir)).to(device_resolved)
     tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
     model.eval()
-    # Create the model pipeline: this is the pipeline that will be used to predict the sentiment of the text
-    model_pipeline = pipeline(
-        "text-classification",
-        model=model,
-        tokenizer=tokenizer,
-        device=device_index,
-    )
-    # Prediction function: takes a dataframe and returns the predictions
+
+    # Prediction function: takes a dataframe and returns class probabilities for each label
     @torch.no_grad()
     def prediction_function(df: pd.DataFrame) -> np.ndarray:
-        preds = model_pipeline(df["text"].tolist())
-        # As in the notebook, use the 'score' returned by the pipeline.
-        y_pred_proba = [float(p["score"]) for p in preds]
-        return np.array(y_pred_proba, dtype=float)
+        enc = tokenizer(
+            df["text"].tolist(),
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        enc = {k: v.to(device_resolved) for k, v in enc.items()}
+        outputs = model(**enc)
+        probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+        return probs
 
     # Create the Giskard dataset: this is the dataset that will be used to scan the test set.
     # The dataset is created using the test set and the target column.
     giskard_dataset = GiskardDataset(test_df, target="label")
     # Create the Giskard model. This is the model that will be used to scan the test set. 
     # The model is created using the prediction function and the test set.
+    # Use all observed label ids from the test dataframe as classification labels
+    classification_labels = sorted(test_df["label"].unique().tolist())
     giskard_model = GiskardModel(
         model=prediction_function,
         model_type="classification",
-        classification_labels=[0, 1],
+        classification_labels=classification_labels,
         feature_names=["text"],
     )
     # Scan the test set using the Giskard model
