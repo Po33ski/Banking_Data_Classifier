@@ -11,7 +11,7 @@ from sklearn.model_selection import cross_val_predict
 from datasets import Dataset
 from .config import QualityConfig
 
-# get_initial_model_data: get the embeddings and pred_probs from the initial model
+
 def _get_initial_model_data(
     texts: list[str],
     labels: np.ndarray,
@@ -20,11 +20,25 @@ def _get_initial_model_data(
     regularization_c: float,
     device: str = "cuda",
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Compute sentence embeddings and out-of-sample class probabilities
+    using a multinomial logistic regression model suitable for multi-class
+    datasets like banking77.
+    """
     # 1. Compute text embeddings with sentence-transformers
     model = SentenceTransformer(embedding_model_name, device=device)
     embeddings = model.encode(texts, show_progress_bar=True)
-    # 2. Create LogisticRegression object
-    clf = LogisticRegression(random_state=0, C=regularization_c, solver="liblinear")
+
+    # 2. Multinomial LogisticRegression for potentially many classes
+    clf = LogisticRegression(
+        random_state=0,
+        C=regularization_c,
+        solver="lbfgs",
+        class_weight="balanced",
+        max_iter=1000,
+        n_jobs=-1,
+    )
+
     # 3. Train logistic regression and get probability predictions using cross_val_predict
     pred_probs = cross_val_predict(
         clf,
@@ -32,7 +46,7 @@ def _get_initial_model_data(
         labels,
         cv=cv_folds,
         method="predict_proba",
-        n_jobs=1,
+        n_jobs=-1,
     )
     return embeddings, pred_probs 
 
@@ -65,8 +79,8 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
     for rows flagged as is_label_issue. Returns modified dataframe.
     """
     print("[quality] Running CleanLab data quality")
-    texts = df["text"].values
-    labels = df["label"].values
+    texts = df["text"].astype(str).tolist()
+    labels = df["label"].to_numpy()
 
     embeddings, pred_probs = _get_initial_model_data(
         texts=texts,
@@ -81,7 +95,7 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         raise ValueError("[quality] Sample verification failed.")
         
     # create a dataframe with columns: text, label
-    data_df = df[['text', 'label']].copy()     # df is this 5k sample
+    data_df = df[["text", "label"]].copy()     # df is this 5k sample
     dataset = Dataset.from_pandas(data_df, preserve_index=False)
     dataset.set_format(type="python")  # or type="numpy"
     lab = Datalab(dataset, label_name="label", task="classification")
@@ -122,10 +136,11 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         print()
     else:
         print(f"[quality] Label issues flagged: {len(label_issues)}")
-        top_label_issues_y_true = label_issues.head(10)["given_label"]
-        top_label_issues_y_pred = label_issues.head(10)["predicted_label"]
-        top_label_issues_idxs = label_issues.head(10).index
-        top_label_issues_texts = texts[top_label_issues_idxs]
+        top_label_issues = label_issues.head(10)
+        top_label_issues_y_true = top_label_issues["given_label"]
+        top_label_issues_y_pred = top_label_issues["predicted_label"]
+        top_label_issues_idxs = top_label_issues.index
+        top_label_issues_texts = [texts[i] for i in top_label_issues_idxs]
 
         print("Top 10 label issues")
         for text, y_true, y_pred in zip(top_label_issues_texts, top_label_issues_y_true, top_label_issues_y_pred):
@@ -158,10 +173,9 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
             text = texts[idx]
             score = row["outlier_score"]
             label = labels[idx]
-            label_name = "POSITIVE" if label == 1 else "NEGATIVE"
             
             print(f"\n--- Outlier (Score: {score:.4f}) ---")
-            print(f"Label: {label_name} ({label})")
+            print(f"Label id: {label}")
             print(f"Text: \"{text}\"")
             print("-" * 60)
             print()
@@ -170,7 +184,7 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         
         idxs = outlier_issues.index.tolist()
         df_outlier_and_label_fixed = df_outlier_and_label_fixed.drop(index=idxs)
-        print(f"[quality] Dropped {len(outlier_issues)} outlier rows ({len(df_outlier_and_label_fixed)} -> {len(df_outlier_and_label_fixed)})")
+        print(f"[quality] Dropped {len(outlier_issues)} outlier rows ({len(df_label_fixed)} -> {len(df_outlier_and_label_fixed)})")
         print()
 
 

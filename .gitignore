@@ -15,4 +15,4 @@ artifacts/
 .mlruns/
 *.parquet
 .DS_Store
-.banking_data_classifier/
+

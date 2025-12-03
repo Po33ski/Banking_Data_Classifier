@@ -7,7 +7,7 @@ import typer
 
 from .config import ProjectConfig
 from .data_ingest import load_raw_dataset
-from .data_clean import clean_and_label
+from .data_clean import clean_dataframe
 from .quality import run_cleanlab
 from .splits import split_dataframe
 from .train_hf import train_hf
@@ -24,33 +24,39 @@ from .explain import explain_samples
 def ensure_dirs(cfg: ProjectConfig) -> None:
     cfg.paths.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-
+# run_load: load the raw dataset and save it to a parquet files for train and test
 def run_load(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
-    df_neg, df_pos, df_raw = load_raw_dataset(cfg.dataset)
-    out_raw = cfg.paths.artifacts_dir / "raw_preview.parquet"
-    out_neg = cfg.paths.artifacts_dir / "neg_preview.parquet"
-    out_pos = cfg.paths.artifacts_dir / "pos_preview.parquet"
-    df_raw.to_parquet(out_raw, index=False)
-    df_neg.to_frame(name="text").to_parquet(out_neg, index=False)
-    df_pos.to_frame(name="text").to_parquet(out_pos, index=False)
-    typer.echo(f"[load] Preview saved to: {out_raw}, {out_neg}, {out_pos}")
+    df_raw_train, df_raw_test = load_raw_dataset(cfg.dataset)
+    out_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
+    out_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
+    df_raw_train.to_parquet(out_raw_train, index=False)
+    df_raw_test.to_parquet(out_raw_test, index=False)
+    typer.echo(f"[load] Preview saved to: {out_raw_train} and {out_raw_test}")
 
-
+# run_clean: clean the raw dataset and save it to a parquet file
 def run_clean(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
-    in_neg = cfg.paths.artifacts_dir / "neg_preview.parquet"
-    in_pos = cfg.paths.artifacts_dir / "pos_preview.parquet"
-    if not in_neg.exists() or not in_pos.exists():
-        typer.echo("[clean] 'neg_preview.parquet' or 'pos_preview.parquet' not found. Run 'uv run load' first.")
-        raise typer.Exit(code=1)
-    df_neg = pd.read_parquet(in_neg)["text"]
-    df_pos = pd.read_parquet(in_pos)["text"]
-    df_clean = clean_and_label(df_neg, df_pos, cfg.cleaning)
-    out_clean = cfg.paths.artifacts_dir / "clean.parquet"
-    df_clean.to_parquet(out_clean, index=False)
-    typer.echo(f"[clean] Cleaned data saved to: {out_clean}")
-
+    if cfg.cleaning.clean_train:
+        in_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
+        if not in_raw_train.exists():
+            typer.echo("[clean] 'raw_preview_train.parquet' not found. Run 'uv run load' first.")
+            raise typer.Exit(code=1)
+        df_raw_train = pd.read_parquet(in_raw_train)
+        df_clean_train = clean_dataframe(df_raw_train, cfg.cleaning)
+        out_clean_train = cfg.paths.artifacts_dir / "clean_train.parquet"
+        df_clean_train.to_parquet(out_clean_train, index=False)
+        typer.echo(f"[clean] Cleaned data saved to: {out_clean_train}")
+    if cfg.cleaning.clean_test:
+        in_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
+        if not in_raw_test.exists():
+            typer.echo("[clean] 'raw_preview_test.parquet' not found. Run 'uv run load' first.")
+            raise typer.Exit(code=1)
+        df_raw_test = pd.read_parquet(in_raw_test)
+        df_clean_test = clean_dataframe(df_raw_test, cfg.cleaning)
+        out_clean_test = cfg.paths.artifacts_dir / "clean_test.parquet"
+        df_clean_test.to_parquet(out_clean_test, index=False)
+        typer.echo(f"[clean] Cleaned data saved to: {out_clean_test}")
 
 def run_quality(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
@@ -69,9 +75,11 @@ def run_quality(cfg: ProjectConfig) -> None:
             stratify=df_clean["label"],
         )
         df_clean = df_clean.reset_index(drop=True)
-    df_fixed = run_cleanlab(df_clean, cfg.quality)
-    out = cfg.paths.artifacts_dir / "quality_fixed.parquet"
-    df_fixed.to_parquet(out, index=False)
+    for i in range(cfg.quality.quality_iterations):
+        typer.echo(f"[quality] Running CleanLab iteration {i+1}")
+        df_clean = run_cleanlab(df_clean, cfg.quality)
+    out = cfg.paths.artifacts_dir / f"quality_fixed.parquet"
+    df_clean.to_parquet(out, index=False)
     typer.echo(f"[quality] Quality output saved to: {out}")
 
 

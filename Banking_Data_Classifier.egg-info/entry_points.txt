@@ -1,0 +1,2 @@
+[console_scripts]
+banking_data_classifier = banking_data_classifier.cli:app

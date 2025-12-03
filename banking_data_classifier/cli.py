@@ -5,11 +5,12 @@ import typer
 
 from .config import ProjectConfig
 from .cli_functions import run_load, run_clean, run_quality, run_split, run_train, run_evaluate, run_explain, run_scan, run_purge
+
 # app: root of the CLI
-app = typer.Typer(add_completion=False, help="Booking Sentiment - MLOps-friendly CLI")
+app = typer.Typer(add_completion=False, help="Banking77 intent classification - MLOps-friendly CLI")
 
 
-# load: load the raw dataset from HuggingFace and return positive/negative Series
+# load: load the raw dataset from HuggingFace and save a preview parquet
 @app.command()
 def load(config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to JSON config file")) -> None:
     cfg = ProjectConfig.load(config)
@@ -76,11 +77,6 @@ def all(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
         run_load,
         run_clean,
         run_quality,
-        run_split,
-        run_train,
-        run_evaluate,
-        run_scan,
-        run_explain,
     )
     for step in steps:
         step(cfg)

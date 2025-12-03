@@ -209,6 +209,43 @@ wheels = [
 ]
 
 [[package]]
+name = "banking-data-classifier"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "captum" },
+    { name = "cleanlab" },
+    { name = "datasets" },
+    { name = "giskard" },
+    { name = "jupyter" },
+    { name = "matplotlib" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "ruff" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "transformers", extra = ["torch"] },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "captum" },
+    { name = "cleanlab" },
+    { name = "datasets", specifier = "<3" },
+    { name = "giskard" },
+    { name = "jupyter" },
+    { name = "matplotlib" },
+    { name = "pandas" },
+    { name = "pydantic", specifier = ">=2" },
+    { name = "ruff" },
+    { name = "scikit-learn" },
+    { name = "sentence-transformers" },
+    { name = "transformers", extras = ["torch"] },
+    { name = "typer", specifier = ">=0.9" },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1352,43 +1389,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8d/8e/2a2d0cd5b1b985c5278202805f48aae6f2adc3ddc0fce3385ec50e07e258/mlflow_skinny-3.6.0.tar.gz", hash = "sha256:cc04706b5b6faace9faf95302a6e04119485e1bfe98ddc9b85b81984e80944b6", size = 1963286, upload-time = "2025-11-07T18:33:52.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0e/78/e8fdc3e1708bdfd1eba64f41ce96b461cae1b505aa08b69352ac99b4caa4/mlflow_skinny-3.6.0-py3-none-any.whl", hash = "sha256:c83b34fce592acb2cc6bddcb507587a6d9ef3f590d9e7a8658c85e0980596d78", size = 2364629, upload-time = "2025-11-07T18:33:50.744Z" },
-]
-
-[[package]]
-name = "mlops-pipeline"
-version = "1.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "captum" },
-    { name = "cleanlab" },
-    { name = "datasets" },
-    { name = "giskard" },
-    { name = "jupyter" },
-    { name = "matplotlib" },
-    { name = "pandas" },
-    { name = "pydantic" },
-    { name = "ruff" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "transformers", extra = ["torch"] },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "captum" },
-    { name = "cleanlab" },
-    { name = "datasets", specifier = "<3" },
-    { name = "giskard" },
-    { name = "jupyter" },
-    { name = "matplotlib" },
-    { name = "pandas" },
-    { name = "pydantic", specifier = ">=2" },
-    { name = "ruff" },
-    { name = "scikit-learn" },
-    { name = "sentence-transformers" },
-    { name = "transformers", extras = ["torch"] },
-    { name = "typer", specifier = ">=0.9" },
 ]
 
 [[package]]
