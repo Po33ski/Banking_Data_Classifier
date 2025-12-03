@@ -88,7 +88,7 @@ def run_cleanlab(df: pd.DataFrame, cfg: QualityConfig) -> pd.DataFrame:
         embedding_model_name=cfg.embedding_model_name,
         cv_folds=cfg.cv_folds,
         regularization_c=cfg.regularization_c,
-        device=cfg.device,
+        device=cfg.embedding_device,
     )
     # verify the sample size and dimension
     if not verify_sample_size(embeddings, pred_probs):

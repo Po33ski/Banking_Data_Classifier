@@ -28,11 +28,18 @@ def ensure_dirs(cfg: ProjectConfig) -> None:
 def run_load(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
     df_raw_train, df_raw_test = load_raw_dataset(cfg.dataset)
-    out_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
-    out_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
-    df_raw_train.to_parquet(out_raw_train, index=False)
-    df_raw_test.to_parquet(out_raw_test, index=False)
-    typer.echo(f"[load] Preview saved to: {out_raw_train} and {out_raw_test}")
+    if cfg.dataset.concatenate_all_samples:
+        df_raw_train = pd.concat([df_raw_train, df_raw_test])
+        out_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet" # it is called train for consistency with the rest of the code
+        df_raw_train.to_parquet(out_raw_train, index=False)
+        typer.echo(f"[load] Preview saved to: {out_raw_train}")
+    else:
+        out_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
+        df_raw_train.to_parquet(out_raw_train, index=False)
+        typer.echo(f"[load] Preview saved to: {out_raw_train}")
+        out_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
+        df_raw_test.to_parquet(out_raw_test, index=False)
+        typer.echo(f"[load] Preview saved to: {out_raw_test}")
 
 # run_clean: clean the raw dataset and save it to a parquet file
 def run_clean(cfg: ProjectConfig) -> None:
@@ -40,7 +47,7 @@ def run_clean(cfg: ProjectConfig) -> None:
     if cfg.cleaning.clean_train:
         in_raw_train = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
         if not in_raw_train.exists():
-            typer.echo("[clean] 'raw_preview_train.parquet' not found. Run 'uv run load' first.")
+            typer.echo("[clean] 'raw_preview_train.parquet' not found. Run 'uv run load' first or check the config of load step.")
             raise typer.Exit(code=1)
         df_raw_train = pd.read_parquet(in_raw_train)
         df_clean_train = clean_dataframe(df_raw_train, cfg.cleaning)
@@ -50,7 +57,7 @@ def run_clean(cfg: ProjectConfig) -> None:
     if cfg.cleaning.clean_test:
         in_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
         if not in_raw_test.exists():
-            typer.echo("[clean] 'raw_preview_test.parquet' not found. Run 'uv run load' first.")
+            typer.echo("[clean] 'raw_preview_test.parquet' not found. Run 'uv run load' first or check the config of load step.")
             raise typer.Exit(code=1)
         df_raw_test = pd.read_parquet(in_raw_test)
         df_clean_test = clean_dataframe(df_raw_test, cfg.cleaning)
@@ -58,12 +65,13 @@ def run_clean(cfg: ProjectConfig) -> None:
         df_clean_test.to_parquet(out_clean_test, index=False)
         typer.echo(f"[clean] Cleaned data saved to: {out_clean_test}")
 
+# run_quality: quality and fix the train and test dataframes
 def run_quality(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
     if cfg.quality.quality_train:   # quality the train dataframe
         in_path_train = cfg.paths.artifacts_dir / "clean_train.parquet"
         if not in_path_train.exists():
-            typer.echo("[quality] 'clean_train.parquet' not found. Run 'uv run clean' first.")
+            typer.echo("[quality] 'clean_train.parquet' not found. Run 'uv run clean' first or check the config of load step.")
             raise typer.Exit(code=1)
         df_clean_train = pd.read_parquet(in_path_train)
         typer.echo("[quality] Running CleanLab for the train dataframe")
@@ -76,7 +84,7 @@ def run_quality(cfg: ProjectConfig) -> None:
     if cfg.quality.quality_test:   # quality the test dataframe
         in_path_test = cfg.paths.artifacts_dir / "clean_test.parquet"
         if not in_path_test.exists():
-            typer.echo("[quality] 'clean_test.parquet' not found. Run 'uv run clean' first.")
+            typer.echo("[quality] 'clean_test.parquet' not found. Run 'uv run clean' first or check the config of load step.")
             raise typer.Exit(code=1)
         df_clean_test = pd.read_parquet(in_path_test)
         typer.echo("[quality] Running CleanLab for the test dataframe")
@@ -90,19 +98,36 @@ def run_quality(cfg: ProjectConfig) -> None:
 
 def run_split(cfg: ProjectConfig) -> None:
     ensure_dirs(cfg)
-    in_path = cfg.paths.artifacts_dir / "quality_fixed.parquet"
+    # check if the input data is clean or quality for the train dataframe
+    if cfg.cleaning.clean_train and not cfg.quality.quality_train:
+        in_path = cfg.paths.artifacts_dir / "clean_train.parquet"
+    elif cfg.quality.quality_train:
+        in_path = cfg.paths.artifacts_dir / "quality_fixed_train.parquet"
+    else:
+        in_path = cfg.paths.artifacts_dir / "raw_preview_train.parquet"
     if not in_path.exists():
-        typer.echo("[split] No input data. Run 'uv run clean' (and optionally 'uv run quality') first.")
+        typer.echo("[split] No input data. Run 'uv run clean' (and optionally 'uv run quality') first or check the config of clean or quality step.")
         raise typer.Exit(code=1)
     df_fixed = pd.read_parquet(in_path)
-    if cfg.dataset.sample_size and len(df_fixed) <= cfg.dataset.sample_size:
-        # sample the dataframe to the sample size
-        sample_size_fixed = min(len(df_fixed), cfg.dataset.sample_size)
-        if sample_size_fixed <= len(df_fixed):
-            df_fixed = df_fixed.sample(n=sample_size_fixed, random_state=cfg.dataset.random_state, replace=False)
-            df_fixed = df_fixed.reset_index(drop=True)
-            typer.echo(f"[split] Subsampled to {sample_size_fixed} rows")
-    train_df, valid_df, test_df = split_dataframe(df_fixed, cfg.split)
+    # split the dataframe into train, validation and test sets
+    if cfg.dataset.concatenate_all_samples:
+        # 3-way split produced from the (potentially concatenated) df_fixed
+        train_df, valid_df, test_df = split_dataframe(df_fixed, cfg.split, cfg.dataset.concatenate_all_samples)
+    else:
+        # 2-way split (train/valid); test is provided separately from the original dataset
+        train_df, valid_df, _ = split_dataframe(df_fixed, cfg.split, cfg.dataset.concatenate_all_samples)
+        # if the test dataframe is not from the concatenated all samples dataframe then we need to check if the input data was processed in the previous steps
+        if cfg.cleaning.clean_test and not cfg.quality.quality_test:
+            in_path_test = cfg.paths.artifacts_dir / "clean_test.parquet"
+        elif cfg.quality.quality_test:
+            in_path_test = cfg.paths.artifacts_dir / "quality_fixed_test.parquet"
+        else:
+            in_path_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
+        if not in_path_test.exists():
+            typer.echo("[split] 'clean_test.parquet' or 'quality_fixed_test.parquet' or 'raw_preview_test.parquet' not found. Run 'uv run clean' or 'uv run quality' or 'uv run load' first or check the config of clean, quality or load step.")
+            raise typer.Exit(code=1)
+        test_df = pd.read_parquet(in_path_test)
+    # save the splits to the artifacts directory
     (cfg.paths.artifacts_dir / "splits").mkdir(parents=True, exist_ok=True)
     train_df.to_parquet(cfg.paths.artifacts_dir / "splits/train.parquet", index=False)
     valid_df.to_parquet(cfg.paths.artifacts_dir / "splits/valid.parquet", index=False)

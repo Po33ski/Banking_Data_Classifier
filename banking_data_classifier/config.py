@@ -11,6 +11,8 @@ class DatasetConfig(BaseModel):
     # Hugging Face dataset identifier, e.g. "PolyAI/banking77"
     dataset_name: str = Field(default="PolyAI/banking77")
     random_state: int = Field(default=0)
+    # concatenate all samples into a single dataframe
+    concatenate_all_samples: bool = Field(default=False) #if here is True then the clean_test and quality_test in CleaningConfig and QualityConfig must be False
 
 # CleaningConfig: Configuration for the cleaning like removing terms, casefolding, deduplication, etc.
 class CleaningConfig(BaseModel):
@@ -27,9 +29,11 @@ class CleaningConfig(BaseModel):
 
 # SplitConfig: Configuration for the split
 class SplitConfig(BaseModel):
-    train_frac: float = Field(default=0.6, ge=0.0, le=1.0)
-    valid_frac: float = Field(default=0.1, ge=0.0, le=1.0)
-    test_frac: float = Field(default=0.3, ge=0.0, le=1.0)
+    # # are we using the concatenated all samples dataframe? it must have the same value like concatenate_all_samples in DatasetConfig
+    # use_concatenated_all_samples: bool = Field(default=False) #if here is True then the clean_test and quality_test in CleaningConfig and QualityConfig must be False
+    train_frac: float = Field(default=0.8, ge=0.0, le=1.0)
+    valid_frac: float = Field(default=0.2, ge=0.0, le=1.0)
+    test_frac: float = Field(default=0.0, ge=0.0, le=1.0) # set only if use_concatenated_all_samples is True
     random_state: int = Field(default=0)
     stratify: bool = Field(default=True)
     # validate_sum: validate the sum of the split fractions

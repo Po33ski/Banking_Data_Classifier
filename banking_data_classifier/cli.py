@@ -77,6 +77,7 @@ def all(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
         run_load,
         run_clean,
         run_quality,
+        run_split,
     )
     for step in steps:
         step(cfg)
