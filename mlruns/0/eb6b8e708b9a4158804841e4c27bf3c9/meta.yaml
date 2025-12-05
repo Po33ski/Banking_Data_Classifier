@@ -1,0 +1,14 @@
+artifact_uri: file:///home/jarek/Projects/Banking-data-classifier/mlruns/0/eb6b8e708b9a4158804841e4c27bf3c9/artifacts
+end_time: 1764946874345
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: eb6b8e708b9a4158804841e4c27bf3c9
+run_name: overjoyed-slug-911
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1764946781802
+status: 3
+tags: []
+user_id: jarek

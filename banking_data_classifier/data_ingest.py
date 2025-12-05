@@ -6,6 +6,7 @@ import pandas as pd
 from datasets import load_dataset
 
 from .config import DatasetConfig
+from .utils import label_id_to_name
 
 
 def load_raw_dataset(cfg: DatasetConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -36,7 +37,10 @@ def load_raw_dataset(cfg: DatasetConfig) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df_test = df_raw_test[["text", "label"]].copy()
     df_test["text"] = df_test["text"].astype(str).str.strip()
 
-    print(f"[ingest] Loaded rows: {len(df_train)} (columns: text, label)")
+    df_train["real_label"] = df_train["label"].apply(label_id_to_name)
+    df_test["real_label"] = df_test["label"].apply(label_id_to_name)
+
+    print(f"[ingest] Loaded rows: {len(df_train)} (columns: text, label, real_label)")
     return df_train, df_test
 
 

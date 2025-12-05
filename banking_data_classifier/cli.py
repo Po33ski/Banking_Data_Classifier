@@ -4,7 +4,17 @@ from typing import Optional
 import typer
 
 from .config import ProjectConfig
-from .cli_functions import run_load, run_clean, run_quality, run_split, run_train, run_evaluate, run_scan, run_purge
+from .cli_functions import (
+    run_load,
+    run_clean,
+    run_quality,
+    run_split,
+    run_train,
+    run_evaluate,
+    run_scan,
+    run_purge,
+    run_inference,
+)
 
 # app: root of the CLI
 app = typer.Typer(add_completion=False, help="Banking77 intent classification - MLOps-friendly CLI")
@@ -58,6 +68,15 @@ def scan(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
     cfg = ProjectConfig.load(config)
     run_scan(cfg)
 
+
+@app.command()
+def inference(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
+    """
+    Run interactive inference with the trained intent classifier.
+    """
+    cfg = ProjectConfig.load(config)
+    run_inference(cfg)
+
 @app.command()
 def purge(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
     """
@@ -81,6 +100,7 @@ def all(config: Optional[str] = typer.Option(None, "--config", "-c")) -> None:
         run_train,
         run_evaluate,
         run_scan,
+        run_inference,
     )
     for step in steps:
         step(cfg)

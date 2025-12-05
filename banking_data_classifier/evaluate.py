@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Mapping
 
-import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -14,10 +13,8 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from datasets import DatasetDict
 from transformers import Trainer, TrainingArguments
 
-from .const import CLASS_ID_TO_NAME
 
-
-def evaluate_model(model_dir: str, tokenized_dir: str, len_test_df: int) -> Dict[str, Any]:
+def evaluate_model(model_dir: str, tokenized_dir: str, len_test_df: int, label_lookup: Mapping[int, str] | None = None) -> Dict[str, Any]:
     """
     Evaluate saved HF model on test dataframe and compute metrics.
     """
@@ -72,12 +69,13 @@ def evaluate_model(model_dir: str, tokenized_dir: str, len_test_df: int) -> Dict
     fig.savefig(fig_path)
     plt.close(fig)
 
-    # Save a simple text cheat sheet mapping class ids to human-readable names
-    cheat_lines = ["Class id to name mapping:"]
-    for cid, name in enumerate(CLASS_ID_TO_NAME):
-        cheat_lines.append(f"{cid}: {name}")
-    cheat_text = "\n".join(cheat_lines)
-    (out_dir / "class_id_to_name.txt").write_text(cheat_text, encoding="utf-8")
+    if label_lookup:
+        # Save a simple text cheat sheet mapping class ids to human-readable names
+        cheat_lines = ["Class id to name mapping (from real_label):"]
+        for cid in sorted(label_lookup):
+            cheat_lines.append(f"{cid}: {label_lookup[cid]}")
+        cheat_text = "\n".join(cheat_lines)
+        (out_dir / "class_id_to_name.txt").write_text(cheat_text, encoding="utf-8")
 
     return metrics
 

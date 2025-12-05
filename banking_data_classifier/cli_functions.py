@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-from sklearn.utils import resample
 import pandas as pd
 import typer
 
@@ -10,10 +9,11 @@ from .data_ingest import load_raw_dataset
 from .data_clean import clean_dataframe
 from .quality import run_cleanlab
 from .splits import split_dataframe
-from .train_hf import train_hf
+from .train import train_hf
 from .evaluate import evaluate_model
 from .behavioral import run_giskard_scan
-# from .explain import explain_samples
+from .inference import inference
+from .utils import build_label_lookup
 
 
 
@@ -53,12 +53,12 @@ def run_clean(cfg: ProjectConfig) -> None:
         df_clean_train = clean_dataframe(df_raw_train, cfg.cleaning)
         out_clean_train = cfg.paths.artifacts_dir / "clean_train.parquet"
         df_clean_train.to_parquet(out_clean_train, index=False)
-        typer.echo(f"[clean] Cleaned data saved to: {out_clean_train}")
+        typer.echo(f"[clean] Cleaned data saved to: {out_clean_train}")  
     if cfg.cleaning.clean_test:
         in_raw_test = cfg.paths.artifacts_dir / "raw_preview_test.parquet"
         if not in_raw_test.exists():
             typer.echo("[clean] 'raw_preview_test.parquet' not found. Run 'uv run load' first or check the config of load step.")
-            raise typer.Exit(code=1)
+        raise typer.Exit(code=1)
         df_raw_test = pd.read_parquet(in_raw_test)
         df_clean_test = clean_dataframe(df_raw_test, cfg.cleaning)
         out_clean_test = cfg.paths.artifacts_dir / "clean_test.parquet"
@@ -85,7 +85,7 @@ def run_quality(cfg: ProjectConfig) -> None:
         in_path_test = cfg.paths.artifacts_dir / "clean_test.parquet"
         if not in_path_test.exists():
             typer.echo("[quality] 'clean_test.parquet' not found. Run 'uv run clean' first or check the config of load step.")
-            raise typer.Exit(code=1)
+        raise typer.Exit(code=1)
         df_clean_test = pd.read_parquet(in_path_test)
         typer.echo("[quality] Running CleanLab for the test dataframe")
         for i in range(cfg.quality.quality_iterations):
@@ -157,7 +157,13 @@ def run_evaluate(cfg: ProjectConfig) -> None:
     test_df = pd.read_parquet(splits_dir / "test.parquet")
     model_dir = cfg.paths.artifacts_dir / "finetuned_model"
     tokenized_dir = cfg.paths.artifacts_dir / "tokenized"
-    metrics = evaluate_model(model_dir, tokenized_dir, len(test_df))
+    label_lookup = None
+    if "real_label" in test_df.columns:
+        try:
+            label_lookup = build_label_lookup(test_df)
+        except KeyError:
+            pass
+    metrics = evaluate_model(model_dir, tokenized_dir, len(test_df), label_lookup=label_lookup)
     out = cfg.paths.artifacts_dir / "metrics.json"
     import json as _json
 
@@ -205,3 +211,64 @@ def run_purge(cfg: ProjectConfig) -> None:
         shutil.rmtree(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     typer.echo(f"[purge] Cleaned artifacts directory: {artifacts_dir}")
+
+
+def _load_label_lookup(cfg: ProjectConfig) -> dict[int, str] | None:
+    splits_dir = cfg.paths.artifacts_dir / "splits"
+    candidate_files = [
+        splits_dir / "train.parquet",
+        splits_dir / "valid.parquet",
+        splits_dir / "test.parquet",
+        cfg.paths.artifacts_dir / "clean_train.parquet",
+        cfg.paths.artifacts_dir / "clean_test.parquet",
+        cfg.paths.artifacts_dir / "raw_preview_train.parquet",
+        cfg.paths.artifacts_dir / "raw_preview_test.parquet",
+    ]
+
+    for path in candidate_files:
+        if not path.exists():
+            continue
+        df = pd.read_parquet(path)
+        if "real_label" not in df.columns:
+            continue
+        try:
+            return build_label_lookup(df)
+        except KeyError:
+            continue
+    return None
+
+
+def run_inference(cfg: ProjectConfig) -> None:
+    """
+    Simple interactive inference loop for the trained model.
+    The user can type in sentences and see the most probable class with probability.
+    """
+    ensure_dirs(cfg)
+    model_dir = cfg.paths.artifacts_dir / "finetuned_model"
+    if not model_dir.exists():
+        typer.echo("[inference] Model artifact not found. Run 'uv run banking_data_classifier train' first.")
+        raise typer.Exit(code=1)
+
+    device = getattr(cfg.train, "device", "cuda")
+
+    label_lookup = _load_label_lookup(cfg)
+    if label_lookup is None:
+        typer.echo("[inference] Warning: Could not load real_label mapping. Falling back to numeric label ids.")
+    typer.echo("[inference] Enter a sentence to classify. Type 'q' or 'quit' to exit.")
+    while True:
+        try:
+            text = input("Text> ").strip()
+        except EOFError:
+            break
+        if text.lower() in {"q", "quit"}:
+            break
+        if not text:
+            continue
+
+        preds = inference([text], model_dir=model_dir, device=device, label_lookup=label_lookup)
+        if not preds:
+            typer.echo("[inference] No prediction returned.")
+            continue
+
+        class_id, class_name, prob = preds[0]
+        typer.echo(f"[inference] Predicted class: {class_id} ({class_name}), probability={prob:.4f}")

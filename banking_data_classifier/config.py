@@ -26,6 +26,10 @@ class CleaningConfig(BaseModel):
     min_text_len: int = Field(default=2, ge=0)
     # lowercase_text: lowercase the text
     lowercase_text: bool = Field(default=True)
+    # cut_off_labels: cut off labels which have less than cut_off_labels_threshold number of samples
+    cut_off_labels: bool = Field(default=True)
+    # cut_off_labels_threshold: the threshold for the number of samples per label
+    cut_off_labels_threshold: int = Field(default=80, ge=1)
 
 # SplitConfig: Configuration for the split
 class SplitConfig(BaseModel):
